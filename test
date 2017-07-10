@@ -8,13 +8,13 @@ inputs:
   image-payment:
     default: "100.125.1.34:20202/hwcse/sockshop-payment:0.1.0"
   image-user:
-    default: "100.125.1.34:20202/hwcse/sockshop-user:0.2.0"
+    default: "100.125.1.34:20202/hwcse/sockshop-user:0.3.0"
   image-carts:
     default: "100.125.1.34:20202/hwcse/sockshop-carts:0.3.0"
   image-shipping:
     default: "100.125.1.34:20202/hwcse/sockshop-shipping:0.3.0"
   image-catalogue:
-    default: "100.125.1.34:20202/hwcse/sockshop-cat:0.1.1"
+    default: "100.125.1.34:20202/hwcse/sockshop-cat:0.4.0"
   image-rabbitmq:
     default: "100.125.1.34:20202/hwcse/rabbitmq:3.6.8-management"
   image-queuemaster:
@@ -78,11 +78,47 @@ node_templates:
       namespace: default
       instances: 1
   #frontend
-  frontend-group:
+  sockshop-group:
     type: hwpaas.nodes.AppGroup
     requirements:
       - member:
           node: frontend-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: orders-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: queuemaster-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: shipping-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: carts-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: user-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: payment-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: catalogue-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: rabbitmq-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: mongodb-users-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: mongodb-orders-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: mongodb-carts-app
+          relationship: hwpaas.relationships.ConsistsOf
+      - member:
+          node: mysql-app
           relationship: hwpaas.relationships.ConsistsOf
   #frontend
   frontend-app:
@@ -117,20 +153,14 @@ node_templates:
         service_spec:
           type: NodePort
           ports:
-            - port: 32709
-              nodePort: 8079
+            - port: 8079
+              nodePort: 32709
+              targetPort: 8079
         volumes:
           - name: localtime
             mountpath: /etc/localtime
             readOnly: true
   #orders
-  orders-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: orders-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   orders-app:
     type: hwpaas.nodes.Application
     properties:
@@ -173,14 +203,7 @@ node_templates:
           - name: localtime
             mountpath: /etc/localtime
             readOnly: true
-  #queuemaster 
-  queuemaster-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: queuemaster-app
-          relationship: hwpaas.relationships.ConsistsOf
-
+  #queuemaster
   queuemaster-app:
     type: hwpaas.nodes.Application
     properties:
@@ -233,13 +256,6 @@ node_templates:
             readOnly: true
 
   # shipping
-  shipping-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: shipping-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   shipping-app:
     type: hwpaas.nodes.Application
     properties:
@@ -291,13 +307,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: true
   #carts
-  carts-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: carts-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   carts-app:
     type: hwpaas.nodes.Application
     properties:
@@ -344,13 +353,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: true
   #user
-  user-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: user-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   user-app:
     type: hwpaas.nodes.Application
     properties:
@@ -381,6 +383,8 @@ node_templates:
         env:
           - name: "USER_DATABASE"
             value: mongodb
+          - name: "SC_HOST"
+            value: { get_input: sc_host }
         container_spec:
           image: { get_input: image-user }
         service_spec:
@@ -397,13 +401,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: true
   #payment
-  payment-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: payment-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   payment-app:
     type: hwpaas.nodes.Application
     properties:
@@ -430,6 +427,9 @@ node_templates:
         package_type: container
         container_spec:
           image: { get_input: image-payment }
+        env:
+          - name: "SC_HOST"
+            value: { get_input: sc_host }
         service_spec:
           type: ClusterIP
           ports:
@@ -444,13 +444,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: true
   #catalogue
-  catalogue-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: catalogue-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   catalogue-app:
     type: hwpaas.nodes.Application
     properties:
@@ -486,19 +479,15 @@ node_templates:
         package_type: container
         container_spec:
           image: { get_input: image-catalogue }
+        env:
+          - name: "SC_HOST"
+            value: { get_input: sc_host }
         service_spec:
           type: ClusterIP
           ports:
             - port: 9098
               name: catalogueport
               targetPort: 9098
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
         volumes:
           - name: localtime
             mountpath: /etc/localtime
@@ -507,13 +496,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: true
   #rabbitmq
-  rabbitmq-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: rabbitmq-app
-          relationship: hwpaas.relationships.ConsistsOf
- 
   rabbitmq-app:
     type: hwpaas.nodes.Application
     properties:
@@ -566,13 +548,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: true
   #mongodb-users
-  mongodb-users-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: mongodb-users-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   mongodb-users-app:
     type: hwpaas.nodes.Application
     properties:
@@ -623,13 +598,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: false
 # mongodb-orders
-  mongodb-orders-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: mongodb-orders-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   mongodb-orders-app:
     type: hwpaas.nodes.Application
     properties:
@@ -649,7 +617,7 @@ node_templates:
           node: cse-resolv-volume
           relationship: hwpaas.relationships.AttachesTo
 
-  mongodb-orders :
+  mongodb-orders:
     type: hwpaas.nodes.SoftwareComponent
     properties:
       package:
@@ -675,13 +643,6 @@ node_templates:
             mountpath: /etc/resolv.conf
             readOnly: false
 # mongodb-carts
-  mongodb-carts-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: mongodb-carts-app
-          relationship: hwpaas.relationships.ConsistsOf
-
   mongodb-carts-app:
     type: hwpaas.nodes.Application
     properties:
@@ -726,13 +687,7 @@ node_templates:
           - name: resolv
             mountpath: /etc/resolv.conf
             readOnly: false
-  mysql-group:
-    type: hwpaas.nodes.AppGroup
-    requirements:
-      - member:
-          node: mysql-app
-          relationship: hwpaas.relationships.ConsistsOf
-
+  #mysql
   mysql-app:
     type: hwpaas.nodes.Application
     properties:
