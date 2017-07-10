@@ -2,25 +2,23 @@ tosca_definitions_version: hwpaas_tosca_version_1_4_1
 
 inputs:
   image-frontend:
-    default: "100.125.1.34:20202/hwcse/sockshop-frontend:0.0.42"
-  mongdb_name:
-    type: string
+    default: "100.125.1.34:20202/hwcse/sockshop-frontend:0.0.58"
   image-orders:
     default: "100.125.1.34:20202/hwcse/sockshop-orders:0.3.0"
   image-payment:
-    default: "100.125.1.34:20202/hwcse/sockshop-payment:5.0.0"
+    default: "100.125.1.34:20202/hwcse/sockshop-payment:0.1.0"
   image-user:
-    default: "100.125.1.34:20202/hwcse/sockshop-user:2.0.0"
+    default: "100.125.1.34:20202/hwcse/sockshop-user:0.2.0"
   image-carts:
-    default: "100.125.1.34:20202/hwcse/sockshop-carts:0.1.0"
+    default: "100.125.1.34:20202/hwcse/sockshop-carts:0.3.0"
   image-shipping:
-    default: "100.125.1.34:20202/hwcse/sockshop-shipping:0.1.0"
+    default: "100.125.1.34:20202/hwcse/sockshop-shipping:0.3.0"
   image-catalogue:
-    default: "100.125.1.34:20202/hwcse/sockshop-cat:7.0.0"
-  image-rabbitmq :
-    default: "100.125.1.34:20202/hwcse/rabbitmq:latest"
+    default: "100.125.1.34:20202/hwcse/sockshop-cat:0.1.1"
+  image-rabbitmq:
+    default: "100.125.1.34:20202/hwcse/rabbitmq:3.6.8-management"
   image-queuemaster:
-    default: "100.125.1.34:20202/hwcse/sockshop-queuemaster:0.2.0"
+    default: "100.125.1.34:20202/hwcse/sockshop-queuemaster:0.3.0"
   image-mongodb-orders:
     default: "100.125.1.34:20202/hwcse/mongo:1.0.0"
   image-mongodb-users:
@@ -31,28 +29,6 @@ inputs:
     default: "100.125.1.34:20202/hwcse/sockshop-mysql:1.0.0"
   sc_host:
     default: "100.125.1.34"
-  frontend_port:
-    default: 32709
-  orders_port:
-    default: 7091
-  queuemaster_port:
-    default: 7094
-  user_port:
-    default: 8010
-  payment_port:
-    default: 9099
-  carts_port:
-    default: 7092
-  shipping_port:
-    default: 7093
-  rabbitmq_port:
-    default: 5672
-  catalogue_port:
-    default: 9098
-  mongodb_port:
-    default: 27017
-  mysql_port:
-    default: 3306
   frontend_name:
     default: "frontend"
   orders_name:
@@ -79,18 +55,6 @@ inputs:
     default: "mongodb-carts"
   mysql_name:
     default: "mysql"
-  mongo_user:
-    default: "mongo-user"
-  mongo_password:
-    default: "mongo-password"
-  mongo_host:
-    default: "10.247.83.139:27017"
-  user_database:
-    default: "mongodb"
-  mysql_root_password:
-    default: "default_password"
-  mysql_database:
-    default: "socksdb"
 
 node_templates:
   cse-localtime-volume:
@@ -110,16 +74,17 @@ node_templates:
   bptest-host:
     type: hwpaas.nodes.Cluster
     properties:
-      name: acmeair-tianming
+      name: cse-nodelete
       namespace: default
       instances: 1
+  #frontend
   frontend-group:
     type: hwpaas.nodes.AppGroup
     requirements:
       - member:
           node: frontend-app
           relationship: hwpaas.relationships.ConsistsOf
-
+  #frontend
   frontend-app:
     type: hwpaas.nodes.Application
     properties:
@@ -136,7 +101,7 @@ node_templates:
           node: cse-localtime-volume
           relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: orders
+          node: orders-app
           relationship: hwpaas.relationships.ConnectsTo
 
   frontend:
@@ -146,22 +111,19 @@ node_templates:
         package_type: container
         container_spec:
           image: { get_input: image-frontend }
+        env:
+          - name: "SC_HOST"
+            value: { get_input: sc_host }
         service_spec:
           type: NodePort
           ports:
             - port: 32709
-              nodePort: { get_input: frontend_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              nodePort: 8079
         volumes:
           - name: localtime
             mountpath: /etc/localtime
             readOnly: true
+  #orders
   orders-group:
     type: hwpaas.nodes.AppGroup
     requirements:
@@ -184,8 +146,11 @@ node_templates:
       - volume:
           node: cse-localtime-volume
           relationship: hwpaas.relationships.AttachesTo
+      - volume:
+          node: cse-resolv-volume
+          relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: queuemaster
+          node: queuemaster-app
           relationship: hwpaas.relationships.ConnectsTo
 
   orders:
@@ -202,19 +167,13 @@ node_templates:
           type: ClusterIP
           ports:
             - port: 7091
-              nodePort: { get_input: orders_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              name: ordersport
+              targetPort: 7091
         volumes:
           - name: localtime
             mountpath: /etc/localtime
             readOnly: true
- # queuemaster 
+  #queuemaster 
   queuemaster-group:
     type: hwpaas.nodes.AppGroup
     requirements:
@@ -239,11 +198,14 @@ node_templates:
       - volume:
           node: cse-localtime-volume
           relationship: hwpaas.relationships.AttachesTo
+      - volume:
+          node: cse-resolv-volume
+          relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: shipping
+          node: shipping-app
           relationship: hwpaas.relationships.ConnectsTo
       - dependency:
-          node: rabbitmq
+          node: rabbitmq-app
           relationship: hwpaas.relationships.ConnectsTo
 
   queuemaster:
@@ -260,18 +222,16 @@ node_templates:
           type: ClusterIP
           ports:
             - port: 7094
-              nodePort: { get_input: queuemaster_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              name: queuemasterport
+              targetPort: 7094
         volumes:
           - name: localtime
             mountpath: /etc/localtime
             readOnly: true
+          - name: resolv
+            mountpath: /etc/resolv.conf
+            readOnly: true
+
   # shipping
   shipping-group:
     type: hwpaas.nodes.AppGroup
@@ -301,10 +261,10 @@ node_templates:
           node: cse-resolv-volume
           relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: carts
+          node: carts-app
           relationship: hwpaas.relationships.ConnectsTo
       - dependency:
-          node: rabbitmq
+          node: rabbitmq-app
           relationship: hwpaas.relationships.ConnectsTo
 
   shipping:
@@ -321,14 +281,8 @@ node_templates:
           type: ClusterIP
           ports:
             - port: 7093
-              nodePort: { get_input: shipping_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              name: shippingport
+              targetPort: 7093
         volumes:
           - name: localtime
             mountpath: /etc/localtime
@@ -336,7 +290,7 @@ node_templates:
           - name: resolv
             mountpath: /etc/resolv.conf
             readOnly: true
-
+  #carts
   carts-group:
     type: hwpaas.nodes.AppGroup
     requirements:
@@ -363,7 +317,7 @@ node_templates:
           node: cse-resolv-volume
           relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: user
+          node: user-app
           relationship: hwpaas.relationships.ConnectsTo
 
   carts:
@@ -372,8 +326,6 @@ node_templates:
       package:
         package_type: container
         env:
-          - name: "MONGDB_SERVICE_HOST"
-            value: { get_input: mongdb_name }
           - name: "SC_HOST"
             value: { get_input: sc_host }
         container_spec:
@@ -382,14 +334,8 @@ node_templates:
           type: ClusterIP
           ports:
             - port: 7092
-              nodePort: { get_input: carts_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              name: cartsport
+              targetPort: 7092
         volumes:
           - name: localtime
             mountpath: /etc/localtime
@@ -397,6 +343,7 @@ node_templates:
           - name: resolv
             mountpath: /etc/resolv.conf
             readOnly: true
+  #user
   user-group:
     type: hwpaas.nodes.AppGroup
     requirements:
@@ -423,7 +370,7 @@ node_templates:
           node: cse-resolv-volume
           relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: payment
+          node: payment-app
           relationship: hwpaas.relationships.ConnectsTo
 
   user:
@@ -432,24 +379,16 @@ node_templates:
       package:
         package_type: container
         env:
-         # - name: "MONGO_HOST"
-          #  value: { get_input: mongo_host }
           - name: "USER_DATABASE"
-            value: { get_input: user_database }
+            value: mongodb
         container_spec:
           image: { get_input: image-user }
         service_spec:
           type: ClusterIP
           ports:
             - port: 8081
-              nodePort: { get_input: user_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              name: userport
+              targetPort: 8081
         volumes:
           - name: localtime
             mountpath: /etc/localtime
@@ -457,6 +396,7 @@ node_templates:
           - name: resolv
             mountpath: /etc/resolv.conf
             readOnly: true
+  #payment
   payment-group:
     type: hwpaas.nodes.AppGroup
     requirements:
@@ -479,9 +419,9 @@ node_templates:
       - volume:
           node: cse-localtime-volume
           relationship: hwpaas.relationships.AttachesTo
-      - dependency:
-          node: catalogue
-          relationship: hwpaas.relationships.ConnectsTo
+      - volume:
+          node: cse-resolv-volume
+          relationship: hwpaas.relationships.AttachesTo
 
   payment:
     type: hwpaas.nodes.SoftwareComponent
@@ -491,21 +431,19 @@ node_templates:
         container_spec:
           image: { get_input: image-payment }
         service_spec:
-          type: NodePort
+          type: ClusterIP
           ports:
             - port: 9099
-              nodePort: { get_input: payment_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              name: paymentport
+              targetPort: 9099
         volumes:
           - name: localtime
             mountpath: /etc/localtime
             readOnly: true
+          - name: resolv
+            mountpath: /etc/resolv.conf
+            readOnly: true
+  #catalogue
   catalogue-group:
     type: hwpaas.nodes.AppGroup
     requirements:
@@ -538,10 +476,7 @@ node_templates:
           node: cse-resolv-volume
           relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: rabbitmq
-          relationship: hwpaas.relationships.ConnectsTo
-      - dependency:
-          node: mysql
+          node: rabbitmq-app
           relationship: hwpaas.relationships.ConnectsTo
 
   catalogue:
@@ -555,7 +490,8 @@ node_templates:
           type: ClusterIP
           ports:
             - port: 9098
-              nodePort: { get_input: catalogue_port }
+              name: catalogueport
+              targetPort: 9098
         resource_spec:
           request:
             cpu: 1000m
@@ -570,13 +506,14 @@ node_templates:
           - name: resolv
             mountpath: /etc/resolv.conf
             readOnly: true
+  #rabbitmq
   rabbitmq-group:
     type: hwpaas.nodes.AppGroup
     requirements:
       - member:
-          node: mongodb-orders-app
+          node: rabbitmq-app
           relationship: hwpaas.relationships.ConsistsOf
-
+ 
   rabbitmq-app:
     type: hwpaas.nodes.Application
     properties:
@@ -596,16 +533,16 @@ node_templates:
           node: cse-resolv-volume
           relationship: hwpaas.relationships.AttachesTo
       - dependency:
-          node: mongodb-users
+          node: mongodb-users-app
           relationship: hwpaas.relationships.ConnectsTo
       - dependency:
-          node: mongodb-orders
+          node: mongodb-orders-app
           relationship: hwpaas.relationships.ConnectsTo
       - dependency:
-          node: mongodb-carts
+          node: mongodb-carts-app
           relationship: hwpaas.relationships.ConnectsTo
       - dependency:
-          node: mysql
+          node: mysql-app
           relationship: hwpaas.relationships.ConnectsTo
 
   rabbitmq:
@@ -613,21 +550,14 @@ node_templates:
     properties:
       package:
         package_type: container
-        env:
         container_spec:
           image: { get_input: image-rabbitmq }
         service_spec:
           type: ClusterIP
           ports:
             - port: 5672
-              nodePort: { get_input: rabbitmq_port }
-        resource_spec:
-          request:
-            cpu: 1000m
-            memory: 1024Mi
-          limit:
-            cpu: 1000m
-            memory: 1024Mi
+              name: rabbitmqport
+              targetPort: 5672
         volumes:
           - name: localtime
             mountpath: /etc/localtime
@@ -635,7 +565,7 @@ node_templates:
           - name: resolv
             mountpath: /etc/resolv.conf
             readOnly: true
-
+  #mongodb-users
   mongodb-users-group:
     type: hwpaas.nodes.AppGroup
     requirements:
@@ -669,16 +599,15 @@ node_templates:
         package_type: container
         env:
           - name: "MONGO_INITDB_ROOT_USERNAME"
-            value: {get_input: mongo_user}
+            value: mongo-user
           - name: "MONGO_INITDB_ROOT_PASSWORD"
-            value: {get_input: mongo_password}
+            value: mongo-password
         container_spec:
           image: { get_input: image-mongodb-users }
         service_spec:
           type: ClusterIP
           ports:
             - port: 27017
-              nodePort: { get_input: mongodb_port }
         resource_spec:
           request:
             cpu: 1000m
@@ -830,16 +759,15 @@ node_templates:
         package_type: container
         env:
           - name: "MYSQL_ROOT_PASSWORD"
-            value: { get_input: mysql_root_password }
+            value: default_password
           - name: "MYSQL_DATABASE"
-            value: { get_input: mysql_database }
+            value: socksdb
         container_spec:
           image: { get_input: image-mysql }
         service_spec:
           type: ClusterIP
           ports:
             - port: 3306
-              nodePort: { get_input: mysql_port }
         resource_spec:
           request:
             cpu: 1000m
@@ -853,30 +781,4 @@ node_templates:
             readOnly: false
           - name: resolv
             mountpath: /etc/resolv.conf
-            readOnly: false 
-
-outputs:
-    mysql_ip:
-        description: ip of mysql
-        value: {get_attribute: [mysql,ips]}
-    mysql_port:
-        description: port of mysql
-        value: { get_input: mysql_port }
-    mongodb_carts_ip:
-        description: ip of mongodb_carts
-        value: {get_attribute: [mongodb-carts,ips]}
-    mongodb_carts_port:
-        description: port of mongodb_carts
-        value: { get_input: mongodb_port }
-    mongodb_orders_ip:
-        description: ip of mongodb_orders
-        value: {get_attribute: [mongodb-orders,ips]}
-    mongodb_carts_port:
-        description: port of mongodb_orders
-        value: { get_input: mongodb_port }
-    mongodb_orders_ip:
-        description: ip of mongodb_orders
-        value: {get_attribute: [mongodb-orders,ips]}
-    mongodb_users_port:
-        description: port of mongodb_users
-        value: { get_input: mongodb_port }
+            readOnly: false
