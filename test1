@@ -5,12 +5,13 @@
     <artifactId>java-chassis</artifactId>
     <version>0.1.1-m6</version>
   </parent>
-  <artifactId>providers</artifactId>
+  <artifactId>foundations</artifactId>
   <packaging>pom</packaging>
   <modules>
-      <module>provider-jaxrs</module>
-      <module>provider-pojo</module>
-      <module>provider-rest-common</module>
-      <module>provider-springmvc</module>
+      <module>foundation-vertx</module>
+      <module>foundation-common</module>
+      <module>foundation-config</module>
+      <module>foundation-metrics</module>
+      <module>foundation-ssl</module>
   </modules>
 </project>
